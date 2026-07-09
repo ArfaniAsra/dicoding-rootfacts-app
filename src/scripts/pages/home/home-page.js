@@ -34,10 +34,8 @@ export default class HomePage {
       this.#setStatus(`Menyiapkan Model AI... ${avg}%`);
     };
 
-    let detectionReady = false;
-
     try {
-      const results = await Promise.allSettled([
+      await Promise.all([
         this.#detectionService.loadModel((percent) => {
           progress.detection = percent;
           updateCombinedProgress();
@@ -47,21 +45,7 @@ export default class HomePage {
           updateCombinedProgress();
         }),
       ]);
-
-      detectionReady = results[0].status === "fulfilled";
-      const factsReady = results[1].status === "fulfilled";
-
-      if (!detectionReady) {
-        console.error("Gagal memuat model deteksi:", results[0].reason);
-        this.#setStatus("Gagal Memuat Model Deteksi");
-        return;
-      }
-
-      this.#setStatus(factsReady ? "Model Siap" : "Model Siap (Fun Fact Tidak Tersedia)");
-
-      if (!factsReady) {
-        console.error("Gagal memuat model Generative AI:", results[1].reason);
-      }
+      this.#setStatus("Model Siap");
     } catch (error) {
       this.#setStatus("Gagal Memuat Model");
       console.error(error);
@@ -91,16 +75,27 @@ export default class HomePage {
       }
     });
 
+    cameraSelect.addEventListener("change", async () => {
+      if (this.#isDetecting) {
+        this.#stopDetection();
+        await this.#startDetection(cameraSelect);
+      }
+    });
+
     fpsSlider.addEventListener("input", (event) => {
       this.#currentFPS = Number(event.target.value);
       fpsLabel.textContent = `${this.#currentFPS} FPS`;
+      this.#cameraService.setFPS(this.#currentFPS);
       if (this.#isDetecting) {
         this.#restartDetectionLoop();
       }
     });
 
-    toneSelect.addEventListener("change", (event) => {
+    toneSelect.addEventListener("change", async (event) => {
       this.#rootFactsService.setTone(event.target.value);
+      if (this.#lastResultLabel) {
+        await this.#regenerateFact(this.#lastResultLabel);
+      }
     });
 
     btnCopy.addEventListener("click", () => this.#handleCopy());
@@ -153,18 +148,24 @@ export default class HomePage {
   }
 
   async #handleNewDetection(result) {
-    this.#isProcessingResult = true;
     this.#lastResultLabel = result.label;
 
     this.#showState("result");
     setElementText(document.querySelector("#detected-name"), result.label);
     this.#updateConfidenceOnly(result);
 
+    await this.#regenerateFact(result.label);
+  }
+
+  async #regenerateFact(vegetableLabel) {
+    if (this.#isProcessingResult) return;
+    this.#isProcessingResult = true;
+
     hideElement(document.querySelector("#fun-fact-content"));
     showElement(document.querySelector("#fun-fact-loading"));
 
     try {
-      const fact = await this.#rootFactsService.generateFacts(result.label);
+      const fact = await this.#rootFactsService.generateFacts(vegetableLabel);
       setElementText(document.querySelector("#fun-fact-text"), fact);
     } catch (error) {
       setElementText(document.querySelector("#fun-fact-text"), "Gagal membuat fakta menarik. Coba lagi.");

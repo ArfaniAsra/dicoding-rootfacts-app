@@ -4,10 +4,10 @@ import { isWebGPUSupported, logError } from "../utils/index.js";
 env.backends.onnx.wasm.wasmPaths = "/ort/";
 
 const TONE_DESCRIPTORS = {
-  normal: "an interesting",
-  funny: "a funny and humorous",
-  professional: "a formal and scientific",
-  casual: "a casual, friendly",
+  normal: "interesting",
+  funny: "funny and humorous",
+  professional: "formal and scientific",
+  casual: "casual and friendly, like chatting with a friend",
 };
 
 class RootFactsService {
@@ -57,12 +57,24 @@ class RootFactsService {
 
   #buildPrompt(vegetable, tone) {
     const descriptor = TONE_DESCRIPTORS[tone] || TONE_DESCRIPTORS.normal;
-    return `Describe the vegetable ${vegetable} in ${descriptor} way with one sentence, focusing only on facts about ${vegetable} such as its taste, nutrition, or common use.`;
+    return `Write one ${descriptor} sentence about the vegetable ${vegetable}. Mention only real facts about ${vegetable}, such as its taste, nutrition, or common use. Do not repeat words.`;
   }
 
-  #isRelevant(text, vegetable) {
+  #hasRepetition(text) {
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (sentences.length <= 1) return false;
+    return new Set(sentences).size < sentences.length;
+  }
+
+  #isValidOutput(text, vegetable) {
     if (!text || text.trim().length < 5) return false;
-    return text.toLowerCase().includes(vegetable.toLowerCase());
+    if (!text.toLowerCase().includes(vegetable.toLowerCase())) return false;
+    if (this.#hasRepetition(text)) return false;
+    return true;
   }
 
   #fallbackFact(vegetable) {
@@ -92,15 +104,17 @@ class RootFactsService {
           temperature: 0.4,
           top_p: 0.85,
           do_sample: true,
+          repetition_penalty: 1.3,
+          no_repeat_ngram_size: 3,
         });
 
         const text = output[0].generated_text.trim();
 
-        if (this.#isRelevant(text, cleanVegetable)) {
+        if (this.#isValidOutput(text, cleanVegetable)) {
           return text;
         }
 
-        logError(`Percobaan ${attempt}: output AI tidak relevan dengan "${cleanVegetable}"`, text);
+        logError(`Percobaan ${attempt}: output AI tidak valid untuk "${cleanVegetable}"`, text);
       }
 
       return this.#fallbackFact(cleanVegetable);
