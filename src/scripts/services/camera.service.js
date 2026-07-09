@@ -12,6 +12,15 @@ class CameraService {
     this.canvas = document.getElementById(canvasId);
   }
 
+  #friendlyLabel(device, index) {
+    const label = (device.label || "").toLowerCase();
+    if (label.includes("front") || label.includes("user")) return "Depan";
+    if (label.includes("back") || label.includes("rear") || label.includes("environment")) {
+      return "Belakang";
+    }
+    return device.label || `Kamera ${index + 1}`;
+  }
+
   async loadCameras(cameraSelect) {
     try {
       const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -22,7 +31,7 @@ class CameraService {
       if (this.devices.length > 1 && cameraSelect && !alreadyPopulated) {
         const previousValue = cameraSelect.value;
 
-        cameraSelect.innerHTML = this.devices.map((device, index) => `<option value="${device.deviceId}">${device.label || `Kamera ${index + 1}`}</option>`).join("");
+        cameraSelect.innerHTML = this.devices.map((device, index) => `<option value="${device.deviceId}">${this.#friendlyLabel(device, index)}</option>`).join("");
         cameraSelect.dataset.populated = "true";
 
         const stillExists = this.devices.some((device) => device.deviceId === previousValue);

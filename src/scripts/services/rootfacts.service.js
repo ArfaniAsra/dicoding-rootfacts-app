@@ -10,6 +10,8 @@ const TONE_DESCRIPTORS = {
   casual: "casual and friendly, like chatting with a friend",
 };
 
+const INDONESIAN_MARKERS = ["yang", "adalah", "dan", "untuk", "dengan", "atau", "dari", "pada", "akan", "sayuran", "ini", "itu", "juga", "sangat"];
+
 class RootFactsService {
   constructor() {
     this.generator = null;
@@ -57,7 +59,12 @@ class RootFactsService {
 
   #buildPrompt(vegetable, tone) {
     const descriptor = TONE_DESCRIPTORS[tone] || TONE_DESCRIPTORS.normal;
-    return `Write one ${descriptor} sentence about the vegetable ${vegetable}. Mention only real facts about ${vegetable}, such as its taste, nutrition, or common use. Do not repeat words.`;
+    return `Write one ${descriptor} sentence in English about the vegetable ${vegetable}. Mention only real facts about ${vegetable}, such as its taste, nutrition, or common use. Respond only in English. Do not repeat words.`;
+  }
+
+  #containsIndonesian(text) {
+    const lower = text.toLowerCase();
+    return INDONESIAN_MARKERS.some((word) => new RegExp(`\\b${word}\\b`).test(lower));
   }
 
   #hasRepetition(text) {
@@ -74,6 +81,7 @@ class RootFactsService {
     if (!text || text.trim().length < 5) return false;
     if (!text.toLowerCase().includes(vegetable.toLowerCase())) return false;
     if (this.#hasRepetition(text)) return false;
+    if (this.#containsIndonesian(text)) return false;
     return true;
   }
 
@@ -100,7 +108,7 @@ class RootFactsService {
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const output = await this.generator(prompt, {
-          max_new_tokens: 100,
+          max_new_tokens: 50,
           temperature: 0.4,
           top_p: 0.85,
           do_sample: true,

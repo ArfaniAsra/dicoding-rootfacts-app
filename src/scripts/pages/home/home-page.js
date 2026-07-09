@@ -77,8 +77,7 @@ export default class HomePage {
 
     cameraSelect.addEventListener("change", async () => {
       if (this.#isDetecting) {
-        this.#stopDetection();
-        await this.#startDetection(cameraSelect);
+        await this.#switchCamera(cameraSelect);
       }
     });
 
@@ -122,6 +121,23 @@ export default class HomePage {
     this.#cameraService.stopCamera();
     showElement(document.querySelector("#camera-placeholder"));
     this.#showState("idle");
+  }
+
+  async #switchCamera(cameraSelect) {
+    clearInterval(this.#detectionInterval);
+    this.#cameraService.stopCamera();
+    this.#setStatus("Mengganti kamera...");
+
+    try {
+      await this.#cameraService.startCamera("media-video", "media-canvas", cameraSelect);
+    } catch (error) {
+      alert(getCameraErrorMessage(error));
+      this.#stopDetection();
+      return;
+    }
+
+    this.#setStatus("Model Siap");
+    this.#restartDetectionLoop();
   }
 
   #restartDetectionLoop() {
