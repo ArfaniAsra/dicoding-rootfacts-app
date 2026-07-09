@@ -49,7 +49,6 @@ class DetectionService {
     this.model = model;
     this.labels = metadataResponse.labels;
 
-    // Warm-up: jalankan 1 prediksi dummy supaya prediksi pertama pengguna tidak lambat
     const warmupResult = this.model.predict(tf.zeros([1, 224, 224, 3]));
     warmupResult.dispose();
 

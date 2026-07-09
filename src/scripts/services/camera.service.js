@@ -17,12 +17,10 @@ class CameraService {
       const allDevices = await navigator.mediaDevices.enumerateDevices();
       this.devices = allDevices.filter((d) => d.kind === "videoinput");
 
-      // Hanya timpa opsi <select> kalau memang ada >1 kamera fisik terdeteksi
       if (this.devices.length > 1 && cameraSelect) {
         cameraSelect.innerHTML = this.devices.map((device, index) => `<option value="${device.deviceId}">${device.label || `Kamera ${index + 1}`}</option>`).join("");
       }
     } catch (error) {
-      // Gagal enumerate (mis. belum ada izin) -> biarkan opsi default/front dari template
       this.devices = [];
     }
   }
@@ -32,7 +30,6 @@ class CameraService {
     if (knownDevice) {
       return { video: { deviceId: { exact: knownDevice.deviceId } } };
     }
-    // Fallback: pakai facingMode (khusus mobile, atau default di desktop)
     const facingMode = selectedValue === "front" ? "user" : "environment";
     return { video: { facingMode } };
   }
@@ -71,7 +68,6 @@ class CameraService {
     const [videoTrack] = this.stream.getVideoTracks();
     if (videoTrack) {
       videoTrack.applyConstraints({ frameRate: fps }).catch(() => {
-        // Beberapa kamera/browser tidak mendukung frameRate constraint, abaikan saja
       });
     }
   }
