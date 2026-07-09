@@ -1,7 +1,6 @@
 import {
   APP_CONFIG,
   UI_CONFIG,
-  CAMERA_CONFIG,
 } from "../config.js";
 
 export const isMobileDevice = () => {
