@@ -28,6 +28,7 @@ module.exports = merge(common, {
       skipWaiting: true,
       clientsClaim: true,
       maximumFileSizeToCacheInBytes: 25 * 1024 * 1024,
+      exclude: [/_redirects$/, /\.map$/],
       runtimeCaching: [
         {
           urlPattern: /^https:\/\/api\./i,
