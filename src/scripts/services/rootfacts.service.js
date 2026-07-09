@@ -3,11 +3,11 @@ import { isWebGPUSupported, logError } from "../utils/index.js";
 
 env.backends.onnx.wasm.wasmPaths = "/ort/";
 
-const TONE_INSTRUCTIONS = {
-  normal: "Tell me one short, interesting fun fact",
-  funny: "Tell me one short, funny and humorous fun fact, like a light joke",
-  professional: "Provide one short, formal and scientific fact",
-  casual: "Tell me one short, casual fun fact, like chatting with a friend",
+const TONE_DESCRIPTORS = {
+  normal: "an interesting",
+  funny: "a funny and humorous",
+  professional: "a formal and scientific",
+  casual: "a casual, friendly",
 };
 
 class RootFactsService {
@@ -56,8 +56,17 @@ class RootFactsService {
   }
 
   #buildPrompt(vegetable, tone) {
-    const instruction = TONE_INSTRUCTIONS[tone] || TONE_INSTRUCTIONS.normal;
-    return `${instruction} about ${vegetable}. Keep it to one or two sentences.`;
+    const descriptor = TONE_DESCRIPTORS[tone] || TONE_DESCRIPTORS.normal;
+    return `Describe the vegetable ${vegetable} in ${descriptor} way with one sentence, focusing only on facts about ${vegetable} such as its taste, nutrition, or common use.`;
+  }
+
+  #isRelevant(text, vegetable) {
+    if (!text || text.trim().length < 5) return false;
+    return text.toLowerCase().includes(vegetable.toLowerCase());
+  }
+
+  #fallbackFact(vegetable) {
+    return `${vegetable} adalah sayuran bergizi yang umum digunakan dalam berbagai masakan sehari-hari.`;
   }
 
   async generateFacts(vegetable, tone) {
@@ -71,19 +80,30 @@ class RootFactsService {
     }
 
     const activeTone = tone || this.currentTone;
+    const prompt = this.#buildPrompt(cleanVegetable, activeTone);
+    const maxAttempts = 3;
+
     this.isGenerating = true;
 
     try {
-      const prompt = this.#buildPrompt(cleanVegetable, activeTone);
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const output = await this.generator(prompt, {
+          max_new_tokens: 100,
+          temperature: 0.4,
+          top_p: 0.85,
+          do_sample: true,
+        });
 
-      const output = await this.generator(prompt, {
-        max_new_tokens: 150,
-        temperature: 0.8,
-        top_p: 0.9,
-        do_sample: true,
-      });
+        const text = output[0].generated_text.trim();
 
-      return output[0].generated_text.trim();
+        if (this.#isRelevant(text, cleanVegetable)) {
+          return text;
+        }
+
+        logError(`Percobaan ${attempt}: output AI tidak relevan dengan "${cleanVegetable}"`, text);
+      }
+
+      return this.#fallbackFact(cleanVegetable);
     } finally {
       this.isGenerating = false;
     }
