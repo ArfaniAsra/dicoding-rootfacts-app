@@ -3,14 +3,14 @@ import { isWebGPUSupported, logError } from "../utils/index.js";
 
 env.backends.onnx.wasm.wasmPaths = "/ort/";
 
+const MODEL_ID = "Xenova/LaMini-Flan-T5-77M";
+
 const TONE_DESCRIPTORS = {
   normal: "interesting",
   funny: "funny and humorous",
   professional: "formal and scientific",
   casual: "casual and friendly, like chatting with a friend",
 };
-
-const INDONESIAN_MARKERS = ["yang", "adalah", "dan", "untuk", "dengan", "atau", "dari", "pada", "akan", "sayuran", "ini", "itu", "juga", "sangat"];
 
 class RootFactsService {
   constructor() {
@@ -34,11 +34,11 @@ class RootFactsService {
     };
 
     try {
-      this.generator = await pipeline("text2text-generation", "Xenova/flan-t5-small", preferWebGPU ? { ...progressOptions, device: "webgpu" } : progressOptions);
+      this.generator = await pipeline("text2text-generation", MODEL_ID, preferWebGPU ? { ...progressOptions, device: "webgpu" } : progressOptions);
       this.currentBackend = preferWebGPU ? "webgpu" : "wasm";
     } catch (error) {
       logError("Gagal memuat model dengan WebGPU, fallback ke WASM", error);
-      this.generator = await pipeline("text2text-generation", "Xenova/flan-t5-small", progressOptions);
+      this.generator = await pipeline("text2text-generation", MODEL_ID, progressOptions);
       this.currentBackend = "wasm";
     }
 
@@ -59,12 +59,7 @@ class RootFactsService {
 
   #buildPrompt(vegetable, tone) {
     const descriptor = TONE_DESCRIPTORS[tone] || TONE_DESCRIPTORS.normal;
-    return `Write one ${descriptor} sentence in English about the vegetable ${vegetable}. Mention only real facts about ${vegetable}, such as its taste, nutrition, or common use. Respond only in English. Do not repeat words.`;
-  }
-
-  #containsIndonesian(text) {
-    const lower = text.toLowerCase();
-    return INDONESIAN_MARKERS.some((word) => new RegExp(`\\b${word}\\b`).test(lower));
+    return `Write one ${descriptor} sentence about the vegetable ${vegetable}. Mention only real facts about ${vegetable}, such as its taste, nutrition, or common use. Do not repeat words.`;
   }
 
   #hasRepetition(text) {
@@ -93,12 +88,7 @@ class RootFactsService {
     if (!text || text.trim().length < 5) return false;
     if (!text.toLowerCase().includes(vegetable.toLowerCase())) return false;
     if (this.#hasRepetition(text)) return false;
-    if (this.#containsIndonesian(text)) return false;
     return true;
-  }
-
-  #fallbackFact(vegetable) {
-    return `${vegetable} adalah sayuran bergizi yang umum digunakan dalam berbagai masakan sehari-hari.`;
   }
 
   async generateFacts(vegetable, tone) {
@@ -141,7 +131,7 @@ class RootFactsService {
         logError(`Percobaan ${attempt + 1} tidak valid untuk "${cleanVegetable}"`, text);
       }
 
-      return this.#fallbackFact(cleanVegetable);
+      throw new Error(`Model tidak menghasilkan fakta yang relevan untuk "${cleanVegetable}" setelah beberapa percobaan.`);
     } finally {
       this.isGenerating = false;
     }
