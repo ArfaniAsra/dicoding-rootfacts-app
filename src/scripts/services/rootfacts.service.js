@@ -73,8 +73,20 @@ class RootFactsService {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
 
-    if (sentences.length <= 1) return false;
-    return new Set(sentences).size < sentences.length;
+    if (sentences.length > 1 && new Set(sentences).size < sentences.length) {
+      return true;
+    }
+
+    const words = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (words.length < 8) return false;
+
+    const uniqueRatio = new Set(words).size / words.length;
+    return uniqueRatio < 0.6;
   }
 
   #isValidOutput(text, vegetable) {
@@ -101,19 +113,23 @@ class RootFactsService {
 
     const activeTone = tone || this.currentTone;
     const prompt = this.#buildPrompt(cleanVegetable, activeTone);
-    const maxAttempts = 3;
+
+    const strategies = [
+      { do_sample: false, num_beams: 4 },
+      { do_sample: true, temperature: 0.3, top_p: 0.85 },
+      { do_sample: true, temperature: 0.6, top_p: 0.9 },
+      { do_sample: true, temperature: 0.8, top_p: 0.95 },
+    ];
 
     this.isGenerating = true;
 
     try {
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      for (let attempt = 0; attempt < strategies.length; attempt++) {
         const output = await this.generator(prompt, {
           max_new_tokens: 50,
-          temperature: 0.4,
-          top_p: 0.85,
-          do_sample: true,
           repetition_penalty: 1.3,
           no_repeat_ngram_size: 3,
+          ...strategies[attempt],
         });
 
         const text = output[0].generated_text.trim();
@@ -122,7 +138,7 @@ class RootFactsService {
           return text;
         }
 
-        logError(`Percobaan ${attempt}: output AI tidak valid untuk "${cleanVegetable}"`, text);
+        logError(`Percobaan ${attempt + 1} tidak valid untuk "${cleanVegetable}"`, text);
       }
 
       return this.#fallbackFact(cleanVegetable);
