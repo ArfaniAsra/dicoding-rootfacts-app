@@ -17,8 +17,18 @@ class CameraService {
       const allDevices = await navigator.mediaDevices.enumerateDevices();
       this.devices = allDevices.filter((d) => d.kind === "videoinput");
 
-      if (this.devices.length > 1 && cameraSelect) {
+      const alreadyPopulated = cameraSelect?.dataset.populated === "true";
+
+      if (this.devices.length > 1 && cameraSelect && !alreadyPopulated) {
+        const previousValue = cameraSelect.value;
+
         cameraSelect.innerHTML = this.devices.map((device, index) => `<option value="${device.deviceId}">${device.label || `Kamera ${index + 1}`}</option>`).join("");
+        cameraSelect.dataset.populated = "true";
+
+        const stillExists = this.devices.some((device) => device.deviceId === previousValue);
+        if (stillExists) {
+          cameraSelect.value = previousValue;
+        }
       }
     } catch (error) {
       this.devices = [];
@@ -67,8 +77,7 @@ class CameraService {
     if (!this.stream) return;
     const [videoTrack] = this.stream.getVideoTracks();
     if (videoTrack) {
-      videoTrack.applyConstraints({ frameRate: fps }).catch(() => {
-      });
+      videoTrack.applyConstraints({ frameRate: fps }).catch(() => {});
     }
   }
 
